@@ -1,0 +1,47 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install Qt 5.15.2
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '5.15.2'
+          arch: 'win64_msvc2019_64'
+          cache: true
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Build release EXE
+        shell: cmd
+        working-directory: OpcodeFinder
+        run: |
+          qmake OpcodeFinder.pro -spec win32-msvc "CONFIG+=release"
+          nmake
+
+      - name: Package portable EXE
+        shell: cmd
+        run: |
+          mkdir package
+          copy OpcodeFinder\release\OpcodeFinder.exe package\
+          windeployqt --release --compiler-runtime package\OpcodeFinder.exe
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Path package\* -DestinationPath OpcodeFinder-Windows-x64.zip -Force"
+
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpcodeFinder-Windows-x64
+          path: OpcodeFinder-Windows-x64.zip
